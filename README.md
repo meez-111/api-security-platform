@@ -27,7 +27,14 @@ Modern applications expose numerous APIs that can be vulnerable to attacks. Manu
 
 ## 🏗️ Architecture
 
-*[Will be updated with architecture diagrams as we build]*
+Our API Security Scanner uses a modular architecture:
+
+- **Security Scanner**: Coordinates the scanning process
+- **HTTP Client**: Handles all API communication  
+- **Vulnerability Detectors**: Specialized modules for different vulnerability types
+- **Report Generator**: Creates professional security reports
+
+![Architecture Diagram](diagrams/System Architecture Diagram for HorseSec.jepg)
 
 ## 📦 Quick Start
 

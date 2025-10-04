@@ -1,0 +1,31 @@
+[project]
+name = "api-security-platform"
+version = "0.0.1"
+description = "A production-ready API security scanning platform"
+authors = [{ name = "Moaz Sabra", email = "meez.sabra.111@gmail.com" }]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = ["requests>=2.28.0", "click>=8.1.0"]
+
+[project.optional-dependencies]
+dev = ["mypy>=1.0", "pytest>=7.0", "pytest-cov>=4.0"]
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"] # Points to root tests/ directory
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--verbose",
+    "--strict-markers",
+    "--strict-config",
+    "--cov=src",                 # Still measure coverage on src/
+    "--cov-report=term-missing",
+    "--cov-report=html",
+]
+
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
