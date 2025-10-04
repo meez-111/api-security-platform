@@ -34,7 +34,7 @@ Our API Security Scanner uses a modular architecture:
 - **Vulnerability Detectors**: Specialized modules for different vulnerability types
 - **Report Generator**: Creates professional security reports
 
-![Architecture Diagram](diagrams/System Architecture Diagram for HorseSec.jepg)
+![Architecture Diagram](./diagrams/System%20Architecture%20Diagram%20for%20HorseSec.jpg)
 
 ## 📦 Quick Start
 
