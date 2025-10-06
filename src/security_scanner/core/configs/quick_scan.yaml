@@ -1,0 +1,10 @@
+target_url: "https://api.example.com"
+timeout: 15
+follow_redirects: true
+verify_ssl: true
+scan_jwt: false
+scan_headers: true
+scan_cors: false
+headers:
+  User-Agent: "HorseSec-Scanner/1.0.0"
+  Accept: "application/json"
