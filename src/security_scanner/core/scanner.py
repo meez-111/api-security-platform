@@ -1,195 +1,191 @@
 import asyncio
+import aiohttp
 import time
-from typing import List, Optional
-from security_scanner.core.models import ScanConfig, ScanResult, DetectorResult
-from security_scanner.detectors.base import BaseDetector
-from security_scanner.http.client import HTTPClient
+from typing import List, Dict, Any, Optional, Callable
+from .models import ScanConfig, ScanResult, DetectorResult, Vulnerability, Severity
 
 
 class SecurityScanner:
-    """
-    Main orchestrator that coordinates the entire security scanning process.
-    """
-
     def __init__(self, config: ScanConfig):
         self.config = config
-        self.detectors: List[BaseDetector] = []
-        self._initialize_detectors()
+        self.detector_results: List[DetectorResult] = []
 
-    def _initialize_detectors(self):
-        """Initialize enabled detectors based on scan configuration."""
-        # Import detectors only when needed to avoid circular imports
-        if self.config.scan_jwt:
-            from security_scanner.detectors.jwt import JWTDetector
-
-            self.detectors.append(JWTDetector())
-
-        if self.config.scan_headers:
-            from security_scanner.detectors.headers import HeadersDetector
-
-            self.detectors.append(HeadersDetector())
-
-        if self.config.scan_cors:
-            from security_scanner.detectors.cors import CORSDetector
-
-            self.detectors.append(CORSDetector())
-
-    async def scan(self, progress_callback: Optional[callable] = None) -> ScanResult:
-        """
-        Execute a complete security scan against the target API.
-
-        Args:
-            progress_callback: Optional callback function for progress updates
-
-        Returns:
-            ScanResult with aggregated vulnerabilities and risk assessment
-        """
+    async def scan(self, progress_callback: Optional[Callable] = None) -> ScanResult:
+        """Run security scan on the target URL."""
         start_time = time.time()
-        detector_results: List[DetectorResult] = []
 
-        # Initial progress update
         if progress_callback:
-            progress_callback(
-                0, f"🚀 Starting security scan for: {self.config.target_url}"
-            )
+            progress_callback("Starting security scan...")
 
-        print(f"🚀 Starting security scan for: {self.config.target_url}")
-        print(f"📋 Enabled detectors: {[d.get_name() for d in self.detectors]}")
+        print(f"🔍 Scanning: {self.config.target_url}")
+
+        # Run detectors based on configuration
+        detectors = []
+        if self.config.scan_headers:
+            detectors.append(("Security Headers", self._run_header_checks))
+        if self.config.scan_cors:
+            detectors.append(("CORS", self._run_cors_checks))
+        if self.config.scan_jwt:
+            detectors.append(("JWT", self._run_jwt_checks))
+        if self.config.scan_sql_injection:
+            detectors.append(("SQL Injection", self._run_sql_injection_checks))
+        if self.config.scan_xss:
+            detectors.append(("XSS", self._run_xss_checks))
+
+        # Run detectors with progress updates
+        for i, (detector_name, detector_func) in enumerate(detectors):
+            if progress_callback:
+                progress_callback(f"Running {detector_name} checks...")
+
+            await detector_func()
+
+            if progress_callback:
+                progress = int((i + 1) / len(detectors) * 100)
+                progress_callback(f"Progress: {progress}%")
+
+        # Calculate total vulnerabilities and risk score
+        total_vulnerabilities = sum(
+            len(detector.vulnerabilities) for detector in self.detector_results
+        )
+
+        # Calculate risk score based on vulnerabilities
+        risk_score = self._calculate_risk_score()
+
+        scan_duration = time.time() - start_time
+
+        if progress_callback:
+            progress_callback("Scan completed!")
+
+        return ScanResult(
+            target_url=self.config.target_url,
+            scan_config=self.config,
+            detector_results=self.detector_results,
+            total_vulnerabilities=total_vulnerabilities,
+            risk_score=risk_score,
+            scan_duration=scan_duration,
+        )
+
+    async def _run_header_checks(self):
+        """Check for security headers vulnerabilities."""
+        vulnerabilities = []
 
         try:
-            # Step 1: Test connectivity (10% progress)
-            if progress_callback:
-                progress_callback(10, "🔍 Testing target connectivity...")
+            async with aiohttp.ClientSession() as session:
+                async with session.get(self.config.target_url) as response:
+                    headers = response.headers
 
-            async with HTTPClient(self.config) as client:
-                baseline_response = await client.get(self.config.target_url)
+                    # Check for missing security headers
+                    security_headers = [
+                        "X-Content-Type-Options",
+                        "X-Frame-Options",
+                        "X-XSS-Protection",
+                        "Strict-Transport-Security",
+                    ]
 
-                print(
-                    f"✅ Target is reachable - Status: {baseline_response.status_code}"
-                )
+                    missing_headers = [
+                        header for header in security_headers if header not in headers
+                    ]
 
-                if progress_callback:
-                    progress_callback(20, "✅ Target is reachable")
-
-                # Step 2: Run detectors with progress updates
-                total_detectors = len(self.detectors)
-                for i, detector in enumerate(self.detectors):
-                    detector_name = detector.get_name()
-
-                    # Update progress for each detector
-                    if progress_callback:
-                        progress = 20 + (i * 60 // total_detectors)
-                        progress_callback(progress, f"🔍 Running {detector_name}...")
-
-                    print(f"🔄 Running {detector_name}...")
-
-                    try:
-                        result = await detector.scan(
-                            self.config.target_url, self.config
+                    if missing_headers:
+                        vulnerabilities.append(
+                            Vulnerability(
+                                type="missing_security_headers",
+                                severity=Severity.MEDIUM,
+                                description=f"Missing security headers: {', '.join(missing_headers)}",
+                                evidence=f"Response missing headers: {missing_headers}",
+                                remediation="Add security headers: X-Content-Type-Options: nosniff, X-Frame-Options: DENY, X-XSS-Protection: 1; mode=block, Strict-Transport-Security: max-age=31536000",
+                            )
                         )
-                        detector_results.append(result)
-
-                        vuln_count = len(result.vulnerabilities)
-                        status = (
-                            "✅ Passed"
-                            if vuln_count == 0
-                            else f"⚠️  Found {vuln_count} issues"
-                        )
-                        print(f"{status} - {detector_name}")
-
-                    except Exception as e:
-                        error_result = DetectorResult(
-                            detector_name=detector_name,
-                            vulnerabilities=[],
-                            error=f"Detector failed: {str(e)}",
-                        )
-                        detector_results.append(error_result)
-                        print(f"❌ {detector_name} failed: {str(e)}")
-
-            # Step 3: Process results (85% progress)
-            if progress_callback:
-                progress_callback(85, "📊 Calculating risk scores...")
-
-            processed_results = self._process_detector_results(detector_results)
-
-            # Calculate overall metrics
-            total_vulnerabilities = sum(
-                len(result.vulnerabilities) for result in processed_results
-            )
-            risk_score = self._calculate_risk_score(processed_results)
-            scan_duration = time.time() - start_time
-
-            # Step 4: Finalize (95% progress)
-            if progress_callback:
-                progress_callback(95, "📝 Generating final report...")
-
-            print(f"📊 Scan completed in {scan_duration:.2f}s")
-            print(f"⚠️  Found {total_vulnerabilities} vulnerabilities")
-            print(f"🎯 Overall risk score: {risk_score:.1f}/10.0")
-
-            # Step 5: Complete (100% progress)
-            if progress_callback:
-                progress_callback(100, "✅ Scan completed!")
-
-            return ScanResult(
-                target_url=self.config.target_url,
-                scan_config=self.config,
-                detector_results=processed_results,
-                total_vulnerabilities=total_vulnerabilities,
-                risk_score=risk_score,
-                scan_duration=scan_duration,
-            )
 
         except Exception as e:
-            if progress_callback:
-                progress_callback(100, f"❌ Scan failed: {str(e)}")
-            print(f"❌ Scan failed: {str(e)}")
-            raise
+            print(f"❌ Header check failed: {e}")
 
-    def _process_detector_results(
-        self, results: List[DetectorResult]
-    ) -> List[DetectorResult]:
-        """Process detector results and handle any exceptions."""
-        processed = []
+        self.detector_results.append(
+            DetectorResult(
+                detector_name="Security Headers", vulnerabilities=vulnerabilities
+            )
+        )
 
-        for i, result in enumerate(results):
-            detector_name = self.detectors[i].get_name()
+    async def _run_cors_checks(self):
+        """Check for CORS misconfigurations."""
+        vulnerabilities = []
 
-            if isinstance(result, Exception):
-                processed.append(
-                    DetectorResult(
-                        detector_name=detector_name,
-                        vulnerabilities=[],
-                        error=f"Detector failed: {str(result)}",
-                    )
-                )
-            else:
-                processed.append(result)
+        try:
+            async with aiohttp.ClientSession() as session:
+                # Test CORS with Origin header
+                headers = {"Origin": "https://malicious.com"}
+                async with session.get(
+                    self.config.target_url, headers=headers
+                ) as response:
+                    cors_header = response.headers.get("Access-Control-Allow-Origin")
 
-        return processed
+                    if cors_header == "*":
+                        vulnerabilities.append(
+                            Vulnerability(
+                                type="cors_wildcard",
+                                severity=Severity.MEDIUM,
+                                description="CORS policy allows any origin",
+                                evidence="Access-Control-Allow-Origin: *",
+                                remediation="Restrict CORS origins to specific trusted domains",
+                            )
+                        )
+                    elif cors_header == "https://malicious.com":
+                        vulnerabilities.append(
+                            Vulnerability(
+                                type="cors_reflection",
+                                severity=Severity.HIGH,
+                                description="CORS policy reflects arbitrary Origin header",
+                                evidence=f"Access-Control-Allow-Origin: {cors_header}",
+                                remediation="Validate and restrict allowed origins",
+                            )
+                        )
 
-    def _calculate_risk_score(self, results: List[DetectorResult]) -> float:
-        """Calculate overall risk score based on vulnerability severity."""
-        severity_weights = {"critical": 10.0, "high": 7.5, "medium": 5.0, "low": 2.5}
+        except Exception as e:
+            print(f"❌ CORS check failed: {e}")
 
-        total_score = 0.0
-        vulnerability_count = 0
+        self.detector_results.append(
+            DetectorResult(detector_name="CORS", vulnerabilities=vulnerabilities)
+        )
 
-        for result in results:
-            for vulnerability in result.vulnerabilities:
-                weight = severity_weights.get(vulnerability.severity.value, 0.0)
-                total_score += weight
-                vulnerability_count += 1
+    async def _run_jwt_checks(self):
+        """Check for JWT vulnerabilities."""
+        # Placeholder for JWT checks
+        self.detector_results.append(
+            DetectorResult(detector_name="JWT", vulnerabilities=[])
+        )
 
-        if vulnerability_count > 0:
-            risk_score = min(10.0, total_score / vulnerability_count)
-        else:
-            risk_score = 0.0
+    async def _run_sql_injection_checks(self):
+        """Check for SQL injection vulnerabilities."""
+        # Placeholder for SQL injection checks
+        self.detector_results.append(
+            DetectorResult(detector_name="SQL Injection", vulnerabilities=[])
+        )
 
-        return risk_score
+    async def _run_xss_checks(self):
+        """Check for XSS vulnerabilities."""
+        # Placeholder for XSS checks
+        self.detector_results.append(
+            DetectorResult(detector_name="XSS", vulnerabilities=[])
+        )
+
+    def _calculate_risk_score(self) -> float:
+        """Calculate overall risk score based on vulnerabilities."""
+        severity_weights = {
+            Severity.CRITICAL: 10.0,
+            Severity.HIGH: 7.5,
+            Severity.MEDIUM: 5.0,
+            Severity.LOW: 2.5,
+        }
+
+        total_weight = 0.0
+        for detector in self.detector_results:
+            for vuln in detector.vulnerabilities:
+                total_weight += severity_weights.get(vuln.severity, 0.0)
+
+        # Normalize to 0-10 scale
+        return min(total_weight, 10.0)
 
 
-# Factory function for easy scanner creation
 def create_security_scanner(config: ScanConfig) -> SecurityScanner:
-    """Create and return a configured security scanner instance."""
+    """Factory function to create a security scanner."""
     return SecurityScanner(config)

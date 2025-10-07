@@ -1,11 +1,12 @@
-target_url: "https://api.example.com"
-timeout: 60
+target_url: "https://httpbin.org/json"
+timeout: 10
 follow_redirects: true
 verify_ssl: true
 scan_jwt: true
 scan_headers: true
 scan_cors: true
+scan_sql_injection: true
+scan_xss: true
 headers:
   User-Agent: "HorseSec-Scanner/1.0.0"
   Accept: "application/json"
-  Authorization: "Bearer {{token}}"

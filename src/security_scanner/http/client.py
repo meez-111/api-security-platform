@@ -1,226 +1,215 @@
 import asyncio
+import aiohttp
 import time
-from typing import Dict, Optional, Any
-import httpx
+from typing import Dict, Any, Optional
 from security_scanner.core.models import ScanConfig
+
+
+class HTTPResponse:
+    """
+    Wrapper for aiohttp response to provide a consistent interface.
+    """
+
+    def __init__(self, aiohttp_response: aiohttp.ClientResponse, text: str):
+        self.original_response = aiohttp_response
+        self.status_code = aiohttp_response.status
+        self.text = text
+        self.headers = dict(aiohttp_response.headers)
+        self.url = str(aiohttp_response.url)
+
+    def __repr__(self):
+        return f"HTTPResponse(status_code={self.status_code}, url={self.url})"
 
 
 class HTTPClient:
     """
-    HTTP Client for making requests to target APIs.
-
-    Handles session management, retries, timeouts, and rate limiting
-    to be respectful of target APIs while performing security scans.
+    HTTP client for making requests with rate limiting and connection pooling.
+    Now includes proper response handling.
     """
 
     def __init__(self, config: ScanConfig):
         self.config = config
-        self.client: Optional[httpx.AsyncClient] = None
+        self.session: Optional[aiohttp.ClientSession] = None
+        self.last_request_time = 0
+        self.min_request_interval = (
+            0.1  # 100ms between requests (10 requests per second)
+        )
         self.request_count = 0
-        self.start_time = time.time()
 
     async def __aenter__(self):
-        """Async context manager entry"""
-        self.client = httpx.AsyncClient(
-            timeout=self.config.timeout,
-            follow_redirects=self.config.follow_redirects,
-            verify=self.config.verify_ssl,
-            headers=self.config.headers,
+        """Async context manager entry."""
+        timeout = aiohttp.ClientTimeout(total=self.config.timeout)
+        connector = aiohttp.TCPConnector(
+            limit=10, limit_per_host=5
+        )  # Connection pooling
+        self.session = aiohttp.ClientSession(
+            timeout=timeout, connector=connector, headers=self.config.headers or {}
         )
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit"""
-        if self.client:
-            await self.client.aclose()
+        """Async context manager exit."""
+        if self.session:
+            await self.session.close()
+            self.session = None
 
-    async def get(
-        self, url: str, headers: Optional[Dict[str, str]] = None
-    ) -> httpx.Response:
+    async def _respect_rate_limit(self):
         """
-        Send a GET request to the target URL.
-
-        Args:
-            url: Target URL to scan
-            headers: Optional custom headers
-
-        Returns:
-            HTTP response object
+        Respect rate limiting to avoid overwhelming the target.
+        Ensures minimum time between requests.
         """
-        return await self._make_request("GET", url, headers=headers)
+        current_time = time.time()
+        time_since_last_request = current_time - self.last_request_time
 
-    async def post(
-        self,
-        url: str,
-        data: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> httpx.Response:
-        """
-        Send a POST request to the target URL.
+        if time_since_last_request < self.min_request_interval:
+            sleep_time = self.min_request_interval - time_since_last_request
+            await asyncio.sleep(sleep_time)
 
-        Args:
-            url: Target URL to scan
-            data: POST data to send
-            headers: Optional custom headers
-
-        Returns:
-            HTTP response object
-        """
-        return await self._make_request("POST", url, data=data, headers=headers)
-
-    async def options(
-        self, url: str, headers: Optional[Dict[str, str]] = None
-    ) -> httpx.Response:
-        """
-        Send an OPTIONS request (useful for CORS detection).
-
-        Args:
-            url: Target URL to scan
-            headers: Optional custom headers
-
-        Returns:
-            HTTP response object
-        """
-        return await self._make_request("OPTIONS", url, headers=headers)
-
-    async def _make_request(
-        self,
-        method: str,
-        url: str,
-        data: Optional[Dict[str, Any]] = None,
-        headers: Optional[Dict[str, str]] = None,
-    ) -> httpx.Response:
-        """
-        Internal method to make HTTP requests with rate limiting and error handling.
-        """
-        if not self.client:
-            raise RuntimeError("HTTPClient not initialized. Use async context manager.")
-
-        # Rate limiting: don't make more than 10 requests per second
+        self.last_request_time = time.time()
         self.request_count += 1
-        elapsed = time.time() - self.start_time
-        if self.request_count / elapsed > 10:  # More than 10 requests per second
-            await asyncio.sleep(0.1)
+
+    async def request(self, method: str, url: str, **kwargs) -> HTTPResponse:
+        """
+        Make an HTTP request with rate limiting.
+
+        Args:
+            method: HTTP method (GET, POST, etc.)
+            url: Target URL
+            **kwargs: Additional arguments for aiohttp
+
+        Returns:
+            HTTPResponse with status_code, text, and headers
+        """
+        if not self.session:
+            raise RuntimeError("HTTPClient must be used as async context manager")
+
+        # Respect rate limiting
+        await self._respect_rate_limit()
+
+        # Set default headers
+        headers = kwargs.pop("headers", {})
+        if self.config.headers:
+            # Merge config headers with request-specific headers
+            merged_headers = self.config.headers.copy()
+            merged_headers.update(headers)
+            headers = merged_headers
+
+        print(f"🌐 HTTP {method.upper()} {url} (Request #{self.request_count})")
 
         try:
-            response = await self.client.request(
-                method=method, url=url, json=data if data else None, headers=headers
+            # Make the request
+            aiohttp_response = await self.session.request(
+                method=method.upper(),
+                url=url,
+                headers=headers,
+                allow_redirects=self.config.follow_redirects,
+                ssl=self.config.verify_ssl,
+                **kwargs,
             )
+
+            # Read the response text
+            response_text = await aiohttp_response.text()
+
+            # Create our wrapped response
+            response = HTTPResponse(aiohttp_response, response_text)
+
+            print(f"✅ Response: {response.status_code} - {len(response_text)} bytes")
+
             return response
 
-        except httpx.TimeoutException:
-            raise Exception(f"Request timeout after {self.config.timeout} seconds")
-        except httpx.RequestError as e:
-            raise Exception(f"Request failed: {str(e)}")
-
-    def get_response_headers(self, response: httpx.Response) -> Dict[str, str]:
-        """
-        Extract headers from response in a consistent format.
-        """
-        return dict(response.headers)
-
-    def find_jwt_tokens(self, response: httpx.Response) -> list:
-        """
-        Extract JWT tokens from response headers and body.
-
-        Args:
-            response: HTTP response to analyze
-
-        Returns:
-            List of found JWT tokens
-        """
-        tokens = []
-
-        # Check Authorization header
-        auth_header = response.headers.get("authorization", "")
-        if auth_header.startswith("Bearer "):
-            token = auth_header[7:]  # Remove 'Bearer ' prefix
-            if self._looks_like_jwt(token):
-                tokens.append(token)
-
-        # TODO: Check response body for JWT tokens
-        # This would require parsing JSON responses
-
-        return tokens
-
-    def _looks_like_jwt(self, token: str) -> bool:
-        """
-        Check if a string looks like a JWT token.
-
-        Args:
-            token: String to check
-
-        Returns:
-            True if it looks like a JWT token
-        """
-        # JWT tokens have 3 parts separated by dots
-        parts = token.split(".")
-        return len(parts) == 3 and all(part for part in parts)
-
-    async def get_response_analysis(self, url: str) -> dict:
-        """
-        Get comprehensive analysis of HTTP response including headers and potential tokens.
-
-        Args:
-            url: Target URL to analyze
-
-        Returns:
-            Dictionary with response analysis
-        """
-        try:
-            response = await self.get(url)
-
-            analysis = {
-                "status_code": response.status_code,
-                "headers": dict(response.headers),
-                "jwt_tokens": self.find_jwt_tokens(response),
-                "content_type": response.headers.get("content-type", ""),
-                "server": response.headers.get("server", ""),
-                "cors_headers": {
-                    "allow_origin": response.headers.get("access-control-allow-origin"),
-                    "allow_credentials": response.headers.get(
-                        "access-control-allow-credentials"
-                    ),
-                    "allow_methods": response.headers.get(
-                        "access-control-allow-methods"
-                    ),
-                },
-            }
-
-            return analysis
-
+        except aiohttp.ClientError as e:
+            print(f"❌ HTTP request failed: {str(e)}")
+            raise
+        except asyncio.TimeoutError:
+            print(f"⏰ HTTP request timed out after {self.config.timeout}s")
+            raise
         except Exception as e:
-            return {"error": str(e)}
+            print(f"❌ Unexpected error during HTTP request: {str(e)}")
+            raise
 
-    async def test_cors_configuration(
-        self, url: str, test_origin: str = "https://malicious-site.com"
-    ) -> dict:
+    async def get(self, url: str, **kwargs) -> HTTPResponse:
         """
-        Test CORS configuration by sending requests with different origins.
+        Make a GET request.
 
         Args:
-            url: Target URL to test
-            test_origin: Origin header to test with
+            url: Target URL
+            **kwargs: Additional arguments for aiohttp
 
         Returns:
-            Dictionary with CORS test results
+            HTTPResponse
         """
-        test_headers = {"Origin": test_origin}
+        return await self.request("GET", url, **kwargs)
 
-        try:
-            # Test OPTIONS pre-flight request
-            options_response = await self.options(url, headers=test_headers)
+    async def post(self, url: str, **kwargs) -> HTTPResponse:
+        """
+        Make a POST request.
 
-            # Test GET request with origin
-            get_response = await self.get(url, headers=test_headers)
+        Args:
+            url: Target URL
+            **kwargs: Additional arguments for aiohttp
 
-            return {
-                "options_status": options_response.status_code,
-                "options_headers": dict(options_response.headers),
-                "get_status": get_response.status_code,
-                "get_headers": dict(get_response.headers),
-                "test_origin": test_origin,
-            }
+        Returns:
+            HTTPResponse
+        """
+        return await self.request("POST", url, **kwargs)
 
-        except Exception as e:
-            return {"error": str(e)}
+    async def put(self, url: str, **kwargs) -> HTTPResponse:
+        """
+        Make a PUT request.
+
+        Args:
+            url: Target URL
+            **kwargs: Additional arguments for aiohttp
+
+        Returns:
+            HTTPResponse
+        """
+        return await self.request("PUT", url, **kwargs)
+
+    async def delete(self, url: str, **kwargs) -> HTTPResponse:
+        """
+        Make a DELETE request.
+
+        Args:
+            url: Target URL
+            **kwargs: Additional arguments for aiohttp
+
+        Returns:
+            HTTPResponse
+        """
+        return await self.request("DELETE", url, **kwargs)
+
+    async def head(self, url: str, **kwargs) -> HTTPResponse:
+        """
+        Make a HEAD request.
+
+        Args:
+            url: Target URL
+            **kwargs: Additional arguments for aiohttp
+
+        Returns:
+            HTTPResponse
+        """
+        return await self.request("HEAD", url, **kwargs)
+
+    async def options(self, url: str, **kwargs) -> HTTPResponse:
+        """
+        Make an OPTIONS request.
+
+        Args:
+            url: Target URL
+            **kwargs: Additional arguments for aiohttp
+
+        Returns:
+            HTTPResponse
+        """
+        return await self.request("OPTIONS", url, **kwargs)
+
+    def get_request_count(self) -> int:
+        """
+        Get the total number of requests made by this client instance.
+
+        Returns:
+            Number of requests made
+        """
+        return self.request_count

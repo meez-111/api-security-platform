@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block title %}Scan Profiles - HorseSec{% endblock %}
+
+{% block page_title %}Scan Profiles{% endblock %}
+
+{% block content %}
+<div class="row">
+    {% for profile in profiles %}
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    {{ profile.name }}
+                    {% if profile.is_default %}
+                    <span class="badge bg-primary ms-2">Default</span>
+                    {% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                <p class="card-text">{{ profile.description }}</p>
+                
+                <h6>Configuration:</h6>
+                <ul class="list-unstyled">
+                    <li><i class="fas fa-clock me-2"></i>Timeout: {{ profile.config.timeout }}s</li>
+                    <li><i class="fas fa-shield-alt me-2"></i>JWT Scan: {{ profile.config.scan_jwt|yesno:"Enabled,Disabled" }}</li>
+                    <li><i class="fas fa-header me-2"></i>Headers Scan: {{ profile.config.scan_headers|yesno:"Enabled,Disabled" }}</li>
+                    <li><i class="fas fa-exchange-alt me-2"></i>CORS Scan: {{ profile.config.scan_cors|yesno:"Enabled,Disabled" }}</li>
+                    <li><i class="fas fa-database me-2"></i>SQL Injection: {{ profile.config.scan_sql_injection|yesno:"Enabled,Disabled" }}</li>
+                    <li><i class="fas fa-code me-2"></i>XSS Scan: {{ profile.config.scan_xss|yesno:"Enabled,Disabled" }}</li>
+                </ul>
+            </div>
+            <div class="card-footer">
+                <small class="text-muted">Created: {{ profile.created_at|date:"M d, Y" }}</small>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
