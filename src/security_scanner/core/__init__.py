@@ -1,12 +1,14 @@
-from .models import ScanConfig, ScanResult, DetectorResult, Vulnerability, Severity
+from .models import Severity, Vulnerability, DetectorResult, ScanConfig, ScanResult
 from .scanner import SecurityScanner, create_security_scanner
+from .config_manager import ConfigManager
 
 __all__ = [
+    "Severity",
+    "Vulnerability",
+    "DetectorResult",
     "ScanConfig",
     "ScanResult",
-    "DetectorResult",
-    "Vulnerability",
-    "Severity",
     "SecurityScanner",
     "create_security_scanner",
+    "ConfigManager",
 ]
