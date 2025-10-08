@@ -122,6 +122,13 @@ pip install horsesec
 
 ## 📸 Screenshots
 
+### System Architecture Diagram for HorseSec
+<p align="center">
+  <img src="diagrams/System Architecture Diagram for HorseSec.jpg" alt="System Architecture" width="60%">
+  <br>
+  <em>System Architecture Diagram for HorseSec</em>
+</p>
+
 ### Professional HTML Reports
 <p align="center">
   <img src="docs/screenshots/html-report-light.png" alt="HTML Report Light Mode" width="45%">
@@ -144,12 +151,6 @@ pip install horsesec
   <em>Command-line interface with real-time progress and detailed output</em>
 </p>
 
-### Email Reports
-<p align="center">
-  <img src="docs/screenshots/email-report.png" alt="Email Report" width="60%">
-  <br>
-  <em>Professional email reports delivered directly to stakeholders</em>
-</p>
 
 ### Vulnerability Details
 <p align="center">
