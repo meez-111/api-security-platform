@@ -34,15 +34,20 @@ class SecurityScanner:
 
             self.detectors.append(CORSDetector())
 
+        # NEW DETECTORS - Add these lines
+        if self.config.scan_sql_injection:
+            from security_scanner.detectors.sql_injection import SQLInjectionDetector
+
+            self.detectors.append(SQLInjectionDetector())
+
+        if self.config.scan_xss:
+            from security_scanner.detectors.xss import XSSDetector
+
+            self.detectors.append(XSSDetector())
+
     async def scan(self, progress_callback: Optional[callable] = None) -> ScanResult:
         """
         Execute a complete security scan against the target API.
-
-        Args:
-            progress_callback: Optional callback function for progress updates
-
-        Returns:
-            ScanResult with aggregated vulnerabilities and risk assessment
         """
         start_time = time.time()
         detector_results: List[DetectorResult] = []
@@ -110,13 +115,11 @@ class SecurityScanner:
             if progress_callback:
                 progress_callback(85, "📊 Calculating risk scores...")
 
-            processed_results = self._process_detector_results(detector_results)
-
             # Calculate overall metrics
             total_vulnerabilities = sum(
-                len(result.vulnerabilities) for result in processed_results
+                len(result.vulnerabilities) for result in detector_results
             )
-            risk_score = self._calculate_risk_score(processed_results)
+            risk_score = self._calculate_risk_score(detector_results)
             scan_duration = time.time() - start_time
 
             # Step 4: Finalize (95% progress)
@@ -134,7 +137,7 @@ class SecurityScanner:
             return ScanResult(
                 target_url=self.config.target_url,
                 scan_config=self.config,
-                detector_results=processed_results,
+                detector_results=detector_results,
                 total_vulnerabilities=total_vulnerabilities,
                 risk_score=risk_score,
                 scan_duration=scan_duration,

@@ -1,226 +1,195 @@
 #!/usr/bin/env python3
 """
-Enhanced CLI for HorseSec API Security Scanner with configuration files and progress.
+HorseSec CLI - Command Line Interface for Security Scanning
 """
 
 import asyncio
-import sys
 import argparse
-from pathlib import Path
+import sys
+import json
+import os
+from datetime import datetime
+from urllib.parse import urlparse
+from typing import Optional
 
+# Import the new HTML reporter
+from security_scanner.reporters.html_reporter import HTMLReporter
 from security_scanner.core.models import ScanConfig
-from security_scanner.core.scanner import create_security_scanner
-from security_scanner.core.config_manager import ConfigManager
-from security_scanner.reporters import HTMLReporter, JSONReporter
+from security_scanner.core.scanner import SecurityScanner, create_security_scanner
 
 
-def print_progress(percentage: int, message: str):
+def print_progress(percent: int, message: str):
     """Print progress updates."""
-    print(f"[{percentage}%] {message}")
+    print(f"🔄 [{percent}%] {message}")
+
+
+def print_result(result, output_format: str = "text"):
+    """Print scan results in the specified format."""
+    if output_format == "json":
+        print(json.dumps(result.dict(), indent=2))
+    elif output_format == "html":
+        # HTML output is now handled separately via HTMLReporter
+        pass
+    else:  # text format
+        print("\n" + "=" * 50)
+        print("🐎 HorseSec Security Scan Results")
+        print("=" * 50)
+        print(f"🎯 Target: {result.target_url}")
+        print(f"📊 Risk Score: {result.risk_score}/10")
+        print(f"⏱️  Duration: {result.scan_duration:.2f}s")
+        print(f"🔍 Vulnerabilities Found: {result.total_vulnerabilities}")
+        print("-" * 50)
+
+        for detector in result.detector_results:
+            print(f"\n📋 {detector.detector_name}:")
+            if detector.vulnerabilities:
+                for vuln in detector.vulnerabilities:
+                    print(f"   ⚠️  {vuln.type} ({vuln.severity.value})")
+                    print(f"      📝 {vuln.description}")
+                    print(f"      🔍 Evidence: {vuln.evidence}")
+                    print(f"      💡 Fix: {vuln.remediation}")
+                    print()
+            else:
+                print("   ✅ No vulnerabilities found")
+
+        print("=" * 50)
 
 
 async def main():
-    """Main CLI entry point with enhanced argument parsing."""
-    parser = argparse.ArgumentParser(
-        description="🐎 HorseSec API Security Scanner",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  %(prog)s https://api.example.com
-  %(prog)s https://api.example.com --format html
-  %(prog)s https://api.example.com --format json --output custom_report.json
-  %(prog)s https://api.example.com --no-jwt --timeout 60
-  %(prog)s --config config.yaml
-  %(prog)s --quick-scan https://api.example.com
-        """,
+    """Main CLI entry point."""
+    parser = argparse.ArgumentParser(description="HorseSec Security Scanner")
+    parser.add_argument("target", help="Target URL to scan")
+    parser.add_argument(
+        "--timeout", type=int, default=30, help="Request timeout in seconds"
     )
-
-    # Target selection
-    target_group = parser.add_mutually_exclusive_group(required=True)
-    target_group.add_argument("target_url", nargs="?", help="Target API URL to scan")
-    target_group.add_argument(
-        "--config", "-c", help="Load configuration from YAML file"
-    )
-
-    # Scan modes
-    scan_mode = parser.add_mutually_exclusive_group()
-    scan_mode.add_argument(
-        "--quick-scan",
-        action="store_true",
-        help="Run a quick security scan (headers only)",
-    )
-    scan_mode.add_argument(
-        "--full-scan",
-        action="store_true",
-        help="Run a comprehensive security scan (all detectors)",
-    )
-
-    # Output options
     parser.add_argument(
         "--format",
-        "-f",
-        choices=["html", "json"],
-        help="Generate report in specified format",
+        choices=["text", "json", "html"],
+        default="text",
+        help="Output format (default: text)",
     )
-    parser.add_argument("--output", "-o", help="Custom output file path for report")
+    parser.add_argument("--output", "-o", help="Output file path for report")
     parser.add_argument(
-        "--no-progress", action="store_true", help="Disable progress indicators"
+        "--no-ssl-verify",
+        action="store_true",
+        help="Disable SSL certificate verification",
     )
 
-    # Scan configuration
+    # Detector options
     parser.add_argument(
-        "--timeout",
-        type=int,
-        default=30,
-        help="Request timeout in seconds (default: 30)",
+        "--no-headers", action="store_true", help="Skip security headers check"
     )
+    parser.add_argument("--no-cors", action="store_true", help="Skip CORS check")
+    parser.add_argument("--no-jwt", action="store_true", help="Skip JWT check")
     parser.add_argument(
-        "--no-jwt",
-        action="store_false",
-        dest="scan_jwt",
-        help="Disable JWT vulnerability detection",
+        "--no-sqli", action="store_true", help="Skip SQL injection check"
     )
-    parser.add_argument(
-        "--no-headers",
-        action="store_false",
-        dest="scan_headers",
-        help="Disable security headers detection",
-    )
-    parser.add_argument(
-        "--no-cors",
-        action="store_false",
-        dest="scan_cors",
-        help="Disable CORS misconfiguration detection",
-    )
-    parser.add_argument(
-        "--sql-injection",
-        action="store_true",
-        dest="scan_sql_injection",
-        help="Enable SQL injection detection (experimental)",
-    )
-    parser.add_argument(
-        "--xss",
-        action="store_true",
-        dest="scan_xss",
-        help="Enable XSS detection (experimental)",
-    )
+    parser.add_argument("--no-xss", action="store_true", help="Skip XSS check")
 
     args = parser.parse_args()
 
-    # Create scan configuration based on arguments
-    if args.config:
-        # Load from configuration file
-        if not Path(args.config).exists():
-            print(f"❌ Configuration file not found: {args.config}")
-            sys.exit(1)
+    # Create scan configuration
+    config = ScanConfig(
+        target_url=args.target,
+        timeout=args.timeout,
+        verify_ssl=not args.no_ssl_verify,
+        scan_headers=not args.no_headers,
+        scan_cors=not args.no_cors,
+        scan_jwt=not args.no_jwt,
+        scan_sql_injection=not args.no_sqli,
+        scan_xss=not args.no_xss,
+    )
 
-        config = ConfigManager.load_from_yaml(args.config)
-        if args.target_url:
-            config.target_url = args.target_url
-
-    elif args.quick_scan:
-        # Quick scan mode
-        config = ConfigManager.create_quick_scan_config()
-        config.target_url = args.target_url
-
-    elif args.full_scan:
-        # Full scan mode
-        config = ConfigManager.create_full_scan_config()
-        config.target_url = args.target_url
-        config.scan_sql_injection = True
-        config.scan_xss = True
-
-    else:
-        # Standard scan with command line arguments
-        config = ScanConfig(
-            target_url=args.target_url,
-            timeout=args.timeout,
-            follow_redirects=True,
-            verify_ssl=True,
-            scan_jwt=args.scan_jwt,
-            scan_headers=args.scan_headers,
-            scan_cors=args.scan_cors,
-            scan_sql_injection=args.scan_sql_injection,
-            scan_xss=args.scan_xss,
-        )
-
-    print("🐎 HorseSec API Security Scanner")
+    print("🐎 HorseSec Security Scanner")
+    print(f"🎯 Target: {args.target}")
+    print(f"📊 Format: {args.format}")
     print("=" * 50)
 
     try:
         # Create and run scanner
         scanner = create_security_scanner(config)
+        result = await scanner.scan(progress_callback=print_progress)
 
-        # Run scan with or without progress indicators
-        if args.no_progress:
-            result = await scanner.scan()
+        # Generate output based on format
+        if args.format == "html":
+            # Use the new HTML reporter
+            reporter = HTMLReporter()
+
+            # Determine output file path
+            if args.output:
+                output_path = args.output
+            else:
+                # Generate automatic filename using the reporter's method
+                output_path = reporter._get_output_path(result, "html")
+
+            try:
+                # Generate the professional HTML report
+                report_path = reporter.generate(result, output_path)
+
+                # Get absolute path for clarity
+                abs_path = os.path.abspath(report_path)
+
+                print(f"🎨 Professional HTML report generated: {report_path}")
+                print(f"📁 Absolute path: {abs_path}")
+                print("\n✨ Features included:")
+                print("   • Dark/Light mode toggle 🌙/☀️")
+                print("   • Interactive charts and filtering 📊")
+                print("   • Collapsible sections with smooth animations 🎭")
+                print("   • Mobile-responsive design 📱")
+                print("   • Professional security branding 🛡️")
+
+            except Exception as reporter_error:
+                print(f"❌ Failed to generate HTML report: {reporter_error}")
+                # Fallback to text output
+                print("\nFalling back to text format...")
+                print_result(result, "text")
+
+        elif args.format == "json":
+            # Print JSON to console
+            print(json.dumps(result.dict(), indent=2))
+
+            # Also save to file if output path specified
+            if args.output:
+                with open(args.output, "w", encoding="utf-8") as f:
+                    json.dump(result.dict(), f, indent=2)
+                print(f"💾 JSON report saved to: {args.output}")
+
         else:
-            result = await scanner.scan(progress_callback=print_progress)
+            # Text format
+            print_result(result, "text")
 
-        # Print summary to console
-        print_summary(result)
+            # Save to file if output path specified
+            if args.output:
+                # Simple text file output
+                with open(args.output, "w", encoding="utf-8") as f:
+                    f.write(f"HorseSec Security Scan Report\n")
+                    f.write("=" * 50 + "\n")
+                    f.write(f"Target: {result.target_url}\n")
+                    f.write(f"Scan Date: {result.timestamp}\n")
+                    f.write(f"Risk Score: {result.risk_score}/10\n")
+                    f.write(f"Duration: {result.scan_duration:.2f}s\n")
+                    f.write(f"Vulnerabilities Found: {result.total_vulnerabilities}\n")
+                    f.write("=" * 50 + "\n\n")
 
-        # Generate report if requested
-        if args.format:
-            report_path = generate_report(result, args.format, args.output)
-            print(f"📄 Report generated: {report_path}")
+                    for detector in result.detector_results:
+                        f.write(f"{detector.detector_name}:\n")
+                        if detector.vulnerabilities:
+                            for vuln in detector.vulnerabilities:
+                                f.write(f"  - {vuln.type} ({vuln.severity.value})\n")
+                                f.write(f"    Description: {vuln.description}\n")
+                                f.write(f"    Evidence: {vuln.evidence}\n")
+                                f.write(f"    Remediation: {vuln.remediation}\n\n")
+                        else:
+                            f.write("  No vulnerabilities found\n\n")
+
+                print(f"💾 Text report saved to: {args.output}")
 
     except Exception as e:
-        print(f"\n❌ Scan failed: {str(e)}")
+        print(f"❌ Scan failed: {e}")
+        import traceback
+
+        traceback.print_exc()
         sys.exit(1)
-
-
-def print_summary(scan_result):
-    """Print comprehensive scan summary to console."""
-    print("\n" + "=" * 50)
-    print("📋 SCAN SUMMARY")
-    print("=" * 50)
-    print(f"Target: {scan_result.target_url}")
-    print(f"Duration: {scan_result.scan_duration:.2f}s")
-    print(f"Vulnerabilities: {scan_result.total_vulnerabilities}")
-    print(f"Risk Score: {scan_result.risk_score:.1f}/10.0")
-
-    # Print vulnerability breakdown
-    if scan_result.total_vulnerabilities > 0:
-        severity_counts = {}
-        for detector_result in scan_result.detector_results:
-            for vuln in detector_result.vulnerabilities:
-                severity = vuln.severity.value
-                severity_counts[severity] = severity_counts.get(severity, 0) + 1
-
-        print(f"Breakdown: {severity_counts}")
-
-    # Print detailed findings
-    if scan_result.total_vulnerabilities > 0:
-        print("\n🔍 VULNERABILITIES FOUND:")
-        for detector_result in scan_result.detector_results:
-            if detector_result.vulnerabilities:
-                print(f"\n{detector_result.detector_name}:")
-                for vuln in detector_result.vulnerabilities:
-                    severity_icon = {
-                        "critical": "🚨",
-                        "high": "🔴",
-                        "medium": "🟡",
-                        "low": "🔵",
-                    }.get(vuln.severity.value, "⚪")
-
-                    print(f"  {severity_icon} {vuln.title} ({vuln.severity.value})")
-                    print(f"     📍 {vuln.location}")
-                    print(f"     📝 {vuln.description[:100]}...")
-    else:
-        print("\n✅ No vulnerabilities found!")
-
-
-def generate_report(scan_result, format: str, output_path: str = None) -> str:
-    """Generate report in specified format."""
-    if format == "html":
-        reporter = HTMLReporter()
-    elif format == "json":
-        reporter = JSONReporter()
-    else:
-        raise ValueError(f"Unsupported format: {format}")
-
-    return reporter.generate(scan_result, output_path)
 
 
 if __name__ == "__main__":

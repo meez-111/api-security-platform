@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Security Assessment Report - https://www.google.com</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            /* Light theme */
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-tertiary: #f1f5f9;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --text-tertiary: #94a3b8;
+            --border: #e2e8f0;
+            --border-light: #f1f5f9;
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --primary-light: #dbeafe;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --critical: #dc2626;
+            --high: #ea580c;
+            --medium: #d97706;
+            --low: #059669;
+            --info: #06b6d4;
+            --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            --radius: 8px;
+            --radius-lg: 12px;
+            --radius-xl: 16px;
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #cbd5e1;
+            --text-tertiary: #94a3b8;
+            --border: #475569;
+            --border-light: #334155;
+            --primary: #60a5fa;
+            --primary-dark: #3b82f6;
+            --primary-light: #1e3a8a;
+            --success: #34d399;
+            --warning: #fbbf24;
+            --error: #f87171;
+            --critical: #f87171;
+            --high: #fb923c;
+            --medium: #fbbf24;
+            --low: #34d399;
+            --info: #22d3ee;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            transition: all 0.3s ease;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header */
+        .report-header {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: white;
+            padding: 3rem 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .report-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+            z-index: 2;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo-icon {
+            font-size: 2.5rem;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+        }
+
+        .logo-text h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+        }
+
+        .logo-text p {
+            opacity: 0.9;
+            font-weight: 300;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        /* Theme Toggle */
+        .theme-toggle {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 0.75rem;
+            border-radius: var(--radius);
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .theme-toggle:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-1px);
+        }
+
+        .risk-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 1rem 1.5rem;
+            border-radius: var(--radius-lg);
+            backdrop-filter: blur(10px);
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .risk-score {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.25rem;
+            line-height: 1;
+        }
+
+        .risk-level {
+            font-size: 0.9rem;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Summary Cards */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .summary-card {
+            background: var(--bg-secondary);
+            padding: 1.5rem;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .summary-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: var(--primary);
+        }
+
+        .summary-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .summary-card h3 {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .summary-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        /* Severity Overview */
+        .severity-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+
+        .severity-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1.25rem;
+            border-radius: var(--radius);
+            color: white;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: none;
+        }
+
+        .severity-item:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .severity-item.critical { background: linear-gradient(135deg, var(--critical), #b91c1c); }
+        .severity-item.high { background: linear-gradient(135deg, var(--high), #c2410c); }
+        .severity-item.medium { background: linear-gradient(135deg, var(--medium), #b45309); }
+        .severity-item.low { background: linear-gradient(135deg, var(--low), #047857); }
+
+        .severity-count {
+            font-size: 1.75rem;
+            font-weight: 700;
+        }
+
+        /* Charts */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin: 2rem 0;
+        }
+
+        .chart-container {
+            background: var(--bg-secondary);
+            padding: 1.5rem;
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            position: relative;
+            height: 300px;
+        }
+
+        .chart-container h3 {
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Vulnerabilities */
+        .vulnerabilities-section {
+            background: var(--bg-secondary);
+            border-radius: var(--radius-lg);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            margin: 2rem 0;
+        }
+
+        .section-header {
+            padding: 1.5rem;
+            background: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: between;
+            align-items: center;
+        }
+
+        .section-header h2 {
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .detector-section {
+            border-bottom: 1px solid var(--border);
+        }
+
+        .detector-section:last-child {
+            border-bottom: none;
+        }
+
+        .detector-header {
+            padding: 1.25rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            user-select: none;
+            background: var(--bg-secondary);
+        }
+
+        .detector-header:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .detector-header.active {
+            background: var(--bg-tertiary);
+        }
+
+        .detector-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .detector-icon {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--primary-light);
+            border-radius: var(--radius);
+            color: var(--primary);
+            font-size: 1rem;
+        }
+
+        .detector-title h3 {
+            font-weight: 600;
+        }
+
+        .vulnerability-count {
+            background: var(--primary);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .toggle-icon {
+            transition: transform 0.3s ease;
+            margin-left: 1rem;
+        }
+
+        .detector-header.active .toggle-icon {
+            transform: rotate(180deg);
+        }
+
+        .vulnerability-list {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            background: var(--bg-primary);
+        }
+
+        .vulnerability-list.active {
+            max-height: 5000px;
+        }
+
+        .vulnerability-content {
+            padding: 1.5rem;
+        }
+
+        .vulnerability-item {
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border-left: 4px solid var(--border);
+            transition: all 0.3s ease;
+            border: 1px solid var(--border);
+        }
+
+        .vulnerability-item:hover {
+            transform: translateX(4px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .vulnerability-item.critical { border-left-color: var(--critical); }
+        .vulnerability-item.high { border-left-color: var(--high); }
+        .vulnerability-item.medium { border-left-color: var(--medium); }
+        .vulnerability-item.low { border-left-color: var(--low); }
+
+        .vuln-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+            gap: 1rem;
+        }
+
+        .vuln-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+            flex: 1;
+            color: var(--text-primary);
+        }
+
+        .severity-tag {
+            padding: 0.375rem 0.75rem;
+            border-radius: 20px;
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .severity-tag.critical { background: var(--critical); }
+        .severity-tag.high { background: var(--high); }
+        .severity-tag.medium { background: var(--medium); }
+        .severity-tag.low { background: var(--low); }
+
+        .vuln-details {
+            margin-bottom: 1.5rem;
+        }
+
+        .detail-item {
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: var(--text-secondary);
+            min-width: 100px;
+            font-size: 0.9rem;
+        }
+
+        .detail-value {
+            flex: 1;
+            color: var(--text-primary);
+        }
+
+        .evidence-box {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1rem;
+            margin: 1rem 0;
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: var(--text-primary);
+            position: relative;
+        }
+
+        .evidence-box::before {
+            content: 'Evidence';
+            position: absolute;
+            top: -8px;
+            left: 1rem;
+            background: var(--bg-primary);
+            padding: 0 0.5rem;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .remediation-box {
+            background: var(--bg-tertiary);
+            border-left: 4px solid var(--info);
+            padding: 1.25rem;
+            border-radius: 0 var(--radius) var(--radius) 0;
+        }
+
+        .remediation-box strong {
+            color: var(--info);
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        /* Scan Configuration */
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            padding: 1.5rem;
+        }
+
+        .config-item {
+            text-align: center;
+            padding: 1.25rem;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+
+        .config-item h4 {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .config-value {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        /* Footer */
+        .report-footer {
+            background: var(--bg-tertiary);
+            padding: 2rem 0;
+            text-align: center;
+            color: var(--text-secondary);
+            border-top: 1px solid var(--border);
+            margin-top: 3rem;
+        }
+
+        .footer-content {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .footer-note {
+            font-size: 0.85rem;
+            opacity: 0.8;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.5;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 1.5rem;
+                text-align: center;
+            }
+
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .vuln-header {
+                flex-direction: column;
+                gap: 0.75rem;
+            }
+
+            .severity-tag {
+                align-self: flex-start;
+            }
+
+            .detail-item {
+                flex-direction: column;
+                gap: 0.25rem;
+            }
+
+            .detail-label {
+                min-width: auto;
+            }
+        }
+
+        /* Loading States */
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        /* Print Styles */
+        @media print {
+            .theme-toggle {
+                display: none;
+            }
+            .report-header {
+                background: #3b82f6 !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="report-header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <div class="logo-icon">🛡️</div>
+                    <div class="logo-text">
+                        <h1>Security Assessment Report</h1>
+                        <p>Comprehensive Vulnerability Analysis</p>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <button class="theme-toggle" id="themeToggle" title="Toggle dark mode">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                    <div class="risk-badge">
+                        <div class="risk-score">5.0/10.0</div>
+                        <div class="risk-level">Medium</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Executive Summary -->
+        <section class="summary-grid">
+            <div class="summary-card">
+                <h3><i class="fas fa-globe"></i> Target URL</h3>
+                <div class="summary-value" style="font-size: 1rem; word-break: break-all;">https://www.google.com</div>
+            </div>
+            <div class="summary-card">
+                <h3><i class="fas fa-calendar"></i> Scan Date</h3>
+                <div class="summary-value" style="font-size: 1rem;">2025-10-08 08:43</div>
+            </div>
+            <div class="summary-card">
+                <h3><i class="fas fa-bug"></i> Total Vulnerabilities</h3>
+                <div class="summary-value">4</div>
+            </div>
+            <div class="summary-card">
+                <h3><i class="fas fa-clock"></i> Scan Duration</h3>
+                <div class="summary-value">23.51s</div>
+            </div>
+        </section>
+
+        <!-- Severity Overview -->
+        <section class="severity-overview">
+            <div class="severity-item critical" data-severity="critical">
+                <div class="severity-count">0</div>
+                <div>Critical</div>
+            </div>
+            <div class="severity-item high" data-severity="high">
+                <div class="severity-count">0</div>
+                <div>High</div>
+            </div>
+            <div class="severity-item medium" data-severity="medium">
+                <div class="severity-count">4</div>
+                <div>Medium</div>
+            </div>
+            <div class="severity-item low" data-severity="low">
+                <div class="severity-count">0</div>
+                <div>Low</div>
+            </div>
+        </section>
+
+        <!-- Charts -->
+        <section class="charts-grid">
+            <div class="chart-container">
+                <h3><i class="fas fa-chart-pie"></i> Vulnerabilities by Severity</h3>
+                <canvas id="severityChart"></canvas>
+            </div>
+            <div class="chart-container">
+                <h3><i class="fas fa-chart-bar"></i> Vulnerabilities by Category</h3>
+                <canvas id="categoryChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Vulnerabilities Section -->
+        <section class="vulnerabilities-section">
+            <div class="section-header">
+                <h2><i class="fas fa-search"></i> Vulnerability Details</h2>
+                <div class="filter-controls">
+                    <select id="severityFilter" class="filter-select">
+                        <option value="all">All Severities</option>
+                        <option value="critical">Critical</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+            </div>
+
+            
+            <div class="detector-section" data-detector="security headers">
+                <div class="detector-header" data-target="detector-1">
+                    <div class="detector-title">
+                        <div class="detector-icon">
+                            🛡️
+                        </div>
+                        <h3>Security Headers</h3>
+                    </div>
+                    <div class="vulnerability-count">
+                        4 issues
+                        <i class="fas fa-chevron-down toggle-icon"></i>
+                    </div>
+                </div>
+                <div class="vulnerability-list" id="detector-1">
+                    <div class="vulnerability-content">
+                        
+                        <div class="vulnerability-item medium" data-severity="medium">
+                            <div class="vuln-header">
+                                <div class="vuln-title">Missing X-Content-Type-Options Header</div>
+                                <div class="severity-tag medium">
+                                    medium
+                                </div>
+                            </div>
+                            <div class="vuln-details">
+                                <div class="detail-item">
+                                    <span class="detail-label">Description:</span>
+                                    <span class="detail-value">The X-Content-Type-Options security header is missing from the response</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Location:</span>
+                                    <span class="detail-value">HTTP Response Headers</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Evidence:</span>
+                                    <span class="detail-value">
+                                        <div class="evidence-box">Response does not include X-Content-Type-Options header</div>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="remediation-box">
+                                <strong><i class="fas fa-tools"></i> Remediation</strong>
+                                Add X-Content-Type-Options header with value: nosniff
+                            </div>
+                        </div>
+                        
+                        <div class="vulnerability-item medium" data-severity="medium">
+                            <div class="vuln-header">
+                                <div class="vuln-title">Missing X-Frame-Options Header</div>
+                                <div class="severity-tag medium">
+                                    medium
+                                </div>
+                            </div>
+                            <div class="vuln-details">
+                                <div class="detail-item">
+                                    <span class="detail-label">Description:</span>
+                                    <span class="detail-value">The X-Frame-Options security header is missing from the response</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Location:</span>
+                                    <span class="detail-value">HTTP Response Headers</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Evidence:</span>
+                                    <span class="detail-value">
+                                        <div class="evidence-box">Response does not include X-Frame-Options header</div>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="remediation-box">
+                                <strong><i class="fas fa-tools"></i> Remediation</strong>
+                                Add X-Frame-Options header with value: ['DENY', 'SAMEORIGIN']
+                            </div>
+                        </div>
+                        
+                        <div class="vulnerability-item medium" data-severity="medium">
+                            <div class="vuln-header">
+                                <div class="vuln-title">Missing X-XSS-Protection Header</div>
+                                <div class="severity-tag medium">
+                                    medium
+                                </div>
+                            </div>
+                            <div class="vuln-details">
+                                <div class="detail-item">
+                                    <span class="detail-label">Description:</span>
+                                    <span class="detail-value">The X-XSS-Protection security header is missing from the response</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Location:</span>
+                                    <span class="detail-value">HTTP Response Headers</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Evidence:</span>
+                                    <span class="detail-value">
+                                        <div class="evidence-box">Response does not include X-XSS-Protection header</div>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="remediation-box">
+                                <strong><i class="fas fa-tools"></i> Remediation</strong>
+                                Add X-XSS-Protection header with value: 1; mode=block
+                            </div>
+                        </div>
+                        
+                        <div class="vulnerability-item medium" data-severity="medium">
+                            <div class="vuln-header">
+                                <div class="vuln-title">Missing Strict-Transport-Security Header</div>
+                                <div class="severity-tag medium">
+                                    medium
+                                </div>
+                            </div>
+                            <div class="vuln-details">
+                                <div class="detail-item">
+                                    <span class="detail-label">Description:</span>
+                                    <span class="detail-value">The Strict-Transport-Security security header is missing from the response</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Location:</span>
+                                    <span class="detail-value">HTTP Response Headers</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Evidence:</span>
+                                    <span class="detail-value">
+                                        <div class="evidence-box">Response does not include Strict-Transport-Security header</div>
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="remediation-box">
+                                <strong><i class="fas fa-tools"></i> Remediation</strong>
+                                Add Strict-Transport-Security header with value: max-age=31536000
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+            </div>
+            
+        </section>
+
+        <!-- Scan Configuration -->
+        <section class="vulnerabilities-section">
+            <div class="section-header">
+                <h2><i class="fas fa-cog"></i> Scan Configuration</h2>
+            </div>
+            <div class="config-grid">
+                <div class="config-item">
+                    <h4>Timeout</h4>
+                    <div class="config-value">30s</div>
+                </div>
+                <div class="config-item">
+                    <h4>Follow Redirects</h4>
+                    <div class="config-value">Yes</div>
+                </div>
+                <div class="config-item">
+                    <h4>SSL Verification</h4>
+                    <div class="config-value">Yes</div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer class="report-footer">
+        <div class="container">
+            <div class="footer-content">
+                <p><strong>Generated by HorseSec Security Scanner • 2025-10-08 at 08:44:12</strong></p>
+                <p class="footer-note">
+                    This report contains sensitive security information. Handle with care and ensure proper access controls.
+                    Distribution to unauthorized personnel is prohibited.
+                </p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        class SecurityReport {
+            constructor() {
+                this.currentTheme = localStorage.getItem('theme') || 'light';
+                this.init();
+            }
+
+            init() {
+                this.applyTheme(this.currentTheme);
+                this.initEventListeners();
+                this.initCharts();
+                this.openFirstSection();
+            }
+
+            applyTheme(theme) {
+                document.documentElement.setAttribute('data-theme', theme);
+                const icon = document.querySelector('#themeToggle i');
+                icon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+                localStorage.setItem('theme', theme);
+            }
+
+            toggleTheme() {
+                this.currentTheme = this.currentTheme === 'light' ? 'dark' : 'light';
+                this.applyTheme(this.currentTheme);
+            }
+
+            initEventListeners() {
+                // Theme toggle
+                document.getElementById('themeToggle').addEventListener('click', () => {
+                    this.toggleTheme();
+                });
+
+                // Collapse sections
+                document.querySelectorAll('.detector-header').forEach(header => {
+                    header.addEventListener('click', () => {
+                        this.toggleSection(header);
+                    });
+                });
+
+                // Severity filter
+                document.getElementById('severityFilter').addEventListener('change', (e) => {
+                    this.filterVulnerabilities(e.target.value);
+                });
+
+                // Severity item clicks
+                document.querySelectorAll('.severity-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        const severity = item.getAttribute('data-severity');
+                        document.getElementById('severityFilter').value = severity;
+                        this.filterVulnerabilities(severity);
+                    });
+                });
+            }
+
+            toggleSection(header) {
+                const targetId = header.getAttribute('data-target');
+                const content = document.getElementById(targetId);
+                const isActive = content.classList.contains('active');
+
+                // Toggle current section
+                content.classList.toggle('active');
+                header.classList.toggle('active');
+
+                // Close other sections if this one is opening
+                if (!isActive) {
+                    document.querySelectorAll('.vulnerability-list').forEach(section => {
+                        if (section !== content && section.classList.contains('active')) {
+                            section.classList.remove('active');
+                            section.previousElementSibling.classList.remove('active');
+                        }
+                    });
+                }
+            }
+
+            openFirstSection() {
+                const firstHeader = document.querySelector('.detector-header');
+                if (firstHeader) {
+                    this.toggleSection(firstHeader);
+                }
+            }
+
+            filterVulnerabilities(severity) {
+                const vulnerabilities = document.querySelectorAll('.vulnerability-item');
+                const detectors = document.querySelectorAll('.detector-section');
+                
+                let hasVisibleItems = false;
+
+                vulnerabilities.forEach(vuln => {
+                    const vulnSeverity = vuln.getAttribute('data-severity');
+                    const shouldShow = severity === 'all' || vulnSeverity === severity;
+                    
+                    vuln.style.display = shouldShow ? 'block' : 'none';
+                    if (shouldShow) hasVisibleItems = true;
+                });
+
+                // Show/hide detectors based on visible vulnerabilities
+                detectors.forEach(detector => {
+                    const visibleVulns = detector.querySelectorAll('.vulnerability-item[style="display: block"]');
+                    detector.style.display = visibleVulns.length > 0 ? 'block' : 'none';
+                });
+
+                // Update counts in headers
+                this.updateVulnerabilityCounts();
+            }
+
+            updateVulnerabilityCounts() {
+                document.querySelectorAll('.detector-section').forEach(detector => {
+                    const visibleCount = detector.querySelectorAll('.vulnerability-item[style="display: block"]').length;
+                    const countElement = detector.querySelector('.vulnerability-count');
+                    if (countElement) {
+                        const text = countElement.textContent.replace(/\d+/, visibleCount);
+                        countElement.textContent = text;
+                    }
+                });
+            }
+
+            initCharts() {
+                this.initSeverityChart();
+                this.initCategoryChart();
+            }
+
+            initSeverityChart() {
+                const ctx = document.getElementById('severityChart');
+                if (!ctx) return;
+
+                const data = {
+                    labels: ['Critical', 'High', 'Medium', 'Low'],
+                    datasets: [{
+                        data: [
+                            0,
+                            0,
+                            4,
+                            0
+                        ],
+                        backgroundColor: [
+                            getComputedStyle(document.documentElement).getPropertyValue('--critical'),
+                            getComputedStyle(document.documentElement).getPropertyValue('--high'),
+                            getComputedStyle(document.documentElement).getPropertyValue('--medium'),
+                            getComputedStyle(document.documentElement).getPropertyValue('--low')
+                        ],
+                        borderColor: getComputedStyle(document.documentElement).getPropertyValue('--bg-primary'),
+                        borderWidth: 2,
+                        hoverOffset: 15
+                    }]
+                };
+
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: data,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '60%',
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    color: getComputedStyle(document.documentElement).getPropertyValue('--text-primary'),
+                                    padding: 15,
+                                    usePointStyle: true,
+                                    font: {
+                                        family: 'Inter'
+                                    }
+                                }
+                            },
+                            tooltip: {
+                                backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg-tertiary'),
+                                titleColor: getComputedStyle(document.documentElement).getPropertyValue('--text-primary'),
+                                bodyColor: getComputedStyle(document.documentElement).getPropertyValue('--text-primary'),
+                                borderColor: getComputedStyle(document.documentElement).getPropertyValue('--border'),
+                                borderWidth: 1
+                            }
+                        }
+                    }
+                });
+            }
+
+            initCategoryChart() {
+                const ctx = document.getElementById('categoryChart');
+                if (!ctx) return;
+
+                const categories = {};
+                
+                categories['Security Headers'] = 4;
+                
+
+                const data = {
+                    labels: Object.keys(categories),
+                    datasets: [{
+                        label: 'Vulnerabilities',
+                        data: Object.values(categories),
+                        backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--primary'),
+                        borderColor: getComputedStyle(document.documentElement).getPropertyValue('--primary-dark'),
+                        borderWidth: 2,
+                        borderRadius: 4
+                    }]
+                };
+
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: data,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    stepSize: 1,
+                                    color: getComputedStyle(document.documentElement).getPropertyValue('--text-secondary')
+                                },
+                                grid: {
+                                    color: getComputedStyle(document.documentElement).getPropertyValue('--border')
+                                }
+                            },
+                            x: {
+                                ticks: {
+                                    color: getComputedStyle(document.documentElement).getPropertyValue('--text-secondary')
+                                },
+                                grid: {
+                                    display: false
+                                }
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--bg-tertiary'),
+                                titleColor: getComputedStyle(document.documentElement).getPropertyValue('--text-primary'),
+                                bodyColor: getComputedStyle(document.documentElement).getPropertyValue('--text-primary'),
+                                borderColor: getComputedStyle(document.documentElement).getPropertyValue('--border'),
+                                borderWidth: 1
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            new SecurityReport();
+        });
+    </script>
+</body>
+</html>

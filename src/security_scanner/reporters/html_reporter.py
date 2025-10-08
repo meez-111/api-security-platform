@@ -1,720 +1,268 @@
+import os
 from pathlib import Path
-from typing import Optional, Dict
-import jinja2
+from typing import Optional
+from datetime import datetime
+from jinja2 import Template
+
 from security_scanner.core.models import ScanResult
-from security_scanner.reporters.base import BaseReporter
+from .base import BaseReporter
 
 
 class HTMLReporter(BaseReporter):
     """
-    Generates professional HTML security reports with the beautiful template.
+    HTML reporter that generates professional security assessment reports
+    with dark mode and interactive features.
     """
 
     def __init__(self):
         super().__init__()
-        self.template_env = self._create_template_environment()
-
-    def _create_template_environment(self) -> jinja2.Environment:
-        """Create Jinja2 environment with custom filters."""
-
-        def risk_level(score):
-            if score >= 7.5:
-                return "critical"
-            elif score >= 5:
-                return "high"
-            elif score >= 2.5:
-                return "medium"
-            else:
-                return "low"
-
-        # Create environment with custom filters
-        env = jinja2.Environment(
-            loader=jinja2.FileSystemLoader(str(Path(__file__).parent / "templates")),
-            autoescape=jinja2.select_autoescape(["html", "xml"]),
+        self.template_path = (
+            Path(__file__).parent / "templates" / "security_report.html"
         )
-        env.filters["risk_level"] = risk_level
-        return env
-
-    def _load_template(self) -> jinja2.Template:
-        """Load and return the HTML report template."""
-        template_path = Path(__file__).parent / "templates" / "report.html"
-
-        if not template_path.exists():
-            # Create the beautiful template if it doesn't exist
-            self._create_beautiful_template(template_path)
-
-        return self.template_env.get_template("report.html")
-
-    def _create_beautiful_template(self, template_path: Path):
-        """Create the beautiful HTML template you provided."""
-        template_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Your exact template content
-        template_content = """<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Security Assessment Report - {{ scan_result.target_url }}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        :root {
-            --primary: #2563eb;
-            --primary-dark: #1d4ed8;
-            --critical: #dc2626;
-            --high: #ea580c;
-            --medium: #d97706;
-            --low: #059669;
-            --info: #0369a1;
-            --bg-light: #f8fafc;
-            --bg-white: #ffffff;
-            --text-dark: #1e293b;
-            --text-light: #64748b;
-            --border: #e2e8f0;
-            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background: var(--bg-light);
-            color: var(--text-dark);
-            line-height: 1.6;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-        }
-
-        /* Header */
-        .report-header {
-            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-            color: white;
-            padding: 3rem 0;
-            margin-bottom: 2rem;
-        }
-
-        .header-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .logo-icon {
-            font-size: 2.5rem;
-        }
-
-        .logo-text h1 {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 0.25rem;
-        }
-
-        .logo-text p {
-            opacity: 0.9;
-            font-weight: 300;
-        }
-
-        .risk-badge {
-            background: rgba(255, 255, 255, 0.2);
-            padding: 1rem 1.5rem;
-            border-radius: 12px;
-            backdrop-filter: blur(10px);
-            text-align: center;
-        }
-
-        .risk-score {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-
-        .risk-level {
-            font-size: 0.9rem;
-            opacity: 0.9;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        /* Summary Cards */
-        .summary-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .summary-card {
-            background: var(--bg-white);
-            padding: 1.5rem;
-            border-radius: 12px;
-            box-shadow: var(--shadow);
-            text-align: center;
-        }
-
-        .summary-card h3 {
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--text-light);
-            margin-bottom: 0.5rem;
-        }
-
-        .summary-value {
-            font-size: 2rem;
-            font-weight: 700;
-            color: var(--primary);
-        }
-
-        /* Severity Distribution */
-        .severity-distribution {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
-
-        .severity-item {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding: 1rem;
-            border-radius: 8px;
-            color: white;
-            font-weight: 600;
-        }
-
-        .severity-item.critical { background: var(--critical); }
-        .severity-item.high { background: var(--high); }
-        .severity-item.medium { background: var(--medium); }
-        .severity-item.low { background: var(--low); }
-
-        .severity-count {
-            font-size: 1.5rem;
-            font-weight: 700;
-        }
-
-        /* Charts Section */
-        .charts-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-            margin-bottom: 2rem;
-        }
-
-        .chart-container {
-            background: var(--bg-white);
-            padding: 1.5rem;
-            border-radius: 12px;
-            box-shadow: var(--shadow);
-        }
-
-        .chart-container h3 {
-            margin-bottom: 1rem;
-            color: var(--text-dark);
-            font-weight: 600;
-        }
-
-        /* Vulnerabilities */
-        .vulnerabilities-section {
-            background: var(--bg-white);
-            border-radius: 12px;
-            box-shadow: var(--shadow);
-            overflow: hidden;
-            margin-bottom: 2rem;
-        }
-
-        .section-header {
-            padding: 1.5rem;
-            background: var(--bg-light);
-            border-bottom: 1px solid var(--border);
-        }
-
-        .section-header h2 {
-            font-weight: 600;
-        }
-
-        .detector-section {
-            border-bottom: 1px solid var(--border);
-        }
-
-        .detector-header {
-            padding: 1.5rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        .detector-header:hover {
-            background: var(--bg-light);
-        }
-
-        .detector-title {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .detector-icon {
-            font-size: 1.5rem;
-        }
-
-        .vulnerability-count {
-            background: var(--primary);
-            color: white;
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
-        }
-
-        .vulnerability-list {
-            display: none;
-            padding: 0 1.5rem 1.5rem;
-        }
-
-        .vulnerability-list.active {
-            display: block;
-        }
-
-        .vulnerability-item {
-            background: var(--bg-light);
-            border-radius: 8px;
-            padding: 1.5rem;
-            margin-bottom: 1rem;
-            border-left: 4px solid var(--border);
-        }
-
-        .vulnerability-item.critical { border-left-color: var(--critical); }
-        .vulnerability-item.high { border-left-color: var(--high); }
-        .vulnerability-item.medium { border-left-color: var(--medium); }
-        .vulnerability-item.low { border-left-color: var(--low); }
-
-        .vuln-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 1rem;
-        }
-
-        .vuln-title {
-            font-weight: 600;
-            font-size: 1.1rem;
-            flex: 1;
-        }
-
-        .severity-tag {
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            color: white;
-            font-size: 0.8rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            margin-left: 1rem;
-        }
-
-        .severity-tag.critical { background: var(--critical); }
-        .severity-tag.high { background: var(--high); }
-        .severity-tag.medium { background: var(--medium); }
-        .severity-tag.low { background: var(--low); }
-
-        .vuln-details {
-            margin-bottom: 1rem;
-        }
-
-        .detail-item {
-            margin-bottom: 0.5rem;
-        }
-
-        .detail-label {
-            font-weight: 600;
-            color: var(--text-light);
-            margin-right: 0.5rem;
-        }
-
-        .evidence-box {
-            background: var(--bg-white);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 1rem;
-            margin: 1rem 0;
-            font-family: 'Monaco', 'Consolas', monospace;
-            font-size: 0.9rem;
-            white-space: pre-wrap;
-            word-break: break-all;
-        }
-
-        .remediation-box {
-            background: #f0f9ff;
-            border-left: 4px solid var(--info);
-            padding: 1rem;
-            border-radius: 0 6px 6px 0;
-        }
-
-        /* Footer */
-        .report-footer {
-            background: var(--bg-white);
-            padding: 2rem 0;
-            text-align: center;
-            color: var(--text-light);
-            border-top: 1px solid var(--border);
-            margin-top: 2rem;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .header-content {
-                flex-direction: column;
-                gap: 1.5rem;
-                text-align: center;
-            }
-
-            .charts-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .vuln-header {
-                flex-direction: column;
-                gap: 0.5rem;
-            }
-
-            .severity-tag {
-                align-self: flex-start;
-            }
-        }
-    </style>
-</head>
-<body>
-    <!-- Header -->
-    <header class="report-header">
-        <div class="container">
-            <div class="header-content">
-                <div class="logo">
-                    <div class="logo-icon">🐎</div>
-                    <div class="logo-text">
-                        <h1>HorseSec Security Report</h1>
-                        <p>API Security Assessment</p>
-                    </div>
-                </div>
-                <div class="risk-badge">
-                    <div class="risk-score">{{ "%.1f"|format(scan_result.risk_score) }}/10.0</div>
-                    <div class="risk-level">{{ scan_result.risk_score|risk_level }} Risk</div>
-                </div>
-            </div>
-        </div>
-    </header>
-
-    <div class="container">
-        <!-- Executive Summary -->
-        <section class="summary-grid">
-            <div class="summary-card">
-                <h3>Target URL</h3>
-                <div class="summary-value" style="font-size: 1.1rem; word-break: break-all;">{{ scan_result.target_url }}</div>
-            </div>
-            <div class="summary-card">
-                <h3>Scan Date</h3>
-                <div class="summary-value" style="font-size: 1.1rem;">{{ scan_result.timestamp.strftime('%Y-%m-%d %H:%M') }}</div>
-            </div>
-            <div class="summary-card">
-                <h3>Total Vulnerabilities</h3>
-                <div class="summary-value">{{ scan_result.total_vulnerabilities }}</div>
-            </div>
-            <div class="summary-card">
-                <h3>Scan Duration</h3>
-                <div class="summary-value">{{ "%.2f"|format(scan_result.scan_duration) }}s</div>
-            </div>
-        </section>
-
-        <!-- Severity Distribution -->
-        <section class="severity-distribution">
-            {% set severity_counts = {'critical': 0, 'high': 0, 'medium': 0, 'low': 0} %}
-            {% for detector_result in scan_result.detector_results %}
-                {% for vulnerability in detector_result.vulnerabilities %}
-                    {% set _ = severity_counts.update({vulnerability.severity.value: severity_counts[vulnerability.severity.value] + 1}) %}
-                {% endfor %}
-            {% endfor %}
-
-            <div class="severity-item critical">
-                <div class="severity-count">{{ severity_counts.critical }}</div>
-                <div>Critical</div>
-            </div>
-            <div class="severity-item high">
-                <div class="severity-count">{{ severity_counts.high }}</div>
-                <div>High</div>
-            </div>
-            <div class="severity-item medium">
-                <div class="severity-count">{{ severity_counts.medium }}</div>
-                <div>Medium</div>
-            </div>
-            <div class="severity-item low">
-                <div class="severity-count">{{ severity_counts.low }}</div>
-                <div>Low</div>
-            </div>
-        </section>
-
-        <!-- Charts -->
-        <section class="charts-grid">
-            <div class="chart-container">
-                <h3>Vulnerabilities by Severity</h3>
-                <canvas id="severityChart" width="400" height="300"></canvas>
-            </div>
-            <div class="chart-container">
-                <h3>Vulnerabilities by Detector</h3>
-                <canvas id="detectorChart" width="400" height="300"></canvas>
-            </div>
-        </section>
-
-        <!-- Vulnerabilities Section -->
-        <section class="vulnerabilities-section">
-            <div class="section-header">
-                <h2>Vulnerability Details</h2>
-            </div>
-
-            {% for detector_result in scan_result.detector_results %}
-                {% if detector_result.vulnerabilities %}
-                    <div class="detector-section">
-                        <div class="detector-header" onclick="toggleSection('detector-{{ loop.index }}')">
-                            <div class="detector-title">
-                                <div class="detector-icon">
-                                    {% if 'JWT' in detector_result.detector_name %}🔑
-                                    {% elif 'Header' in detector_result.detector_name %}🛡️
-                                    {% elif 'CORS' in detector_result.detector_name %}🌐
-                                    {% else %}🔍{% endif %}
-                                </div>
-                                <h3>{{ detector_result.detector_name }}</h3>
-                            </div>
-                            <div class="vulnerability-count">
-                                {{ detector_result.vulnerabilities|length }} issue{% if detector_result.vulnerabilities|length > 1 %}s{% endif %}
-                            </div>
-                        </div>
-                        <div class="vulnerability-list" id="detector-{{ loop.index }}">
-                            {% for vulnerability in detector_result.vulnerabilities %}
-                                <div class="vulnerability-item {{ vulnerability.severity.value }}">
-                                    <div class="vuln-header">
-                                        <div class="vuln-title">{{ vulnerability.title }}</div>
-                                        <div class="severity-tag {{ vulnerability.severity.value }}">
-                                            {{ vulnerability.severity.value }}
-                                        </div>
-                                    </div>
-                                    <div class="vuln-details">
-                                        <div class="detail-item">
-                                            <span class="detail-label">Description:</span>
-                                            {{ vulnerability.description }}
-                                        </div>
-                                        <div class="detail-item">
-                                            <span class="detail-label">Location:</span>
-                                            {{ vulnerability.location }}
-                                        </div>
-                                        {% if vulnerability.evidence %}
-                                        <div class="detail-item">
-                                            <span class="detail-label">Evidence:</span>
-                                            <div class="evidence-box">{{ vulnerability.evidence }}</div>
-                                        </div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="remediation-box">
-                                        <strong>🛠️ Remediation:</strong><br>
-                                        {{ vulnerability.remediation }}
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    </div>
-                {% endif %}
-            {% endfor %}
-        </section>
-
-        <!-- Scan Configuration -->
-        <section class="vulnerabilities-section">
-            <div class="section-header">
-                <h2>Scan Configuration</h2>
-            </div>
-            <div style="padding: 1.5rem;">
-                <div class="summary-grid">
-                    <div class="summary-card">
-                        <h3>Timeout</h3>
-                        <div class="summary-value">{{ scan_result.scan_config.timeout }}s</div>
-                    </div>
-                    <div class="summary-card">
-                        <h3>Follow Redirects</h3>
-                        <div class="summary-value">{{ "Yes" if scan_result.scan_config.follow_redirects else "No" }}</div>
-                    </div>
-                    <div class="summary-card">
-                        <h3>SSL Verification</h3>
-                        <div class="summary-value">{{ "Enabled" if scan_result.scan_config.verify_ssl else "Disabled" }}</div>
-                    </div>
-                </div>
-            </div>
-        </section>
-    </div>
-
-    <!-- Footer -->
-    <footer class="report-footer">
-        <div class="container">
-            <p>Generated by HorseSec API Security Scanner • {{ scan_result.timestamp.strftime('%Y-%m-%d at %H:%M:%S') }}</p>
-            <p style="margin-top: 0.5rem; font-size: 0.9rem; opacity: 0.7;">
-                This report contains sensitive security information. Handle with care.
-            </p>
-        </div>
-    </footer>
-
-    <script>
-        // Toggle vulnerability sections
-        function toggleSection(sectionId) {
-            const section = document.getElementById(sectionId);
-            section.classList.toggle('active');
-        }
-
-        // Initialize all sections as collapsed
-        document.addEventListener('DOMContentLoaded', function() {
-            // Open first section by default
-            const firstSection = document.querySelector('.vulnerability-list');
-            if (firstSection) {
-                firstSection.classList.add('active');
-            }
-        });
-
-        // Charts
-        document.addEventListener('DOMContentLoaded', function() {
-            // Severity Chart
-            const severityCtx = document.getElementById('severityChart').getContext('2d');
-            const severityChart = new Chart(severityCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Critical', 'High', 'Medium', 'Low'],
-                    datasets: [{
-                        data: [
-                            {{ severity_counts.critical }},
-                            {{ severity_counts.high }},
-                            {{ severity_counts.medium }},
-                            {{ severity_counts.low }}
-                        ],
-                        backgroundColor: [
-                            '#dc2626', '#ea580c', '#d97706', '#059669'
-                        ],
-                        borderWidth: 2,
-                        borderColor: '#ffffff'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: {
-                            position: 'bottom'
-                        }
-                    }
-                }
-            });
-
-            // Detector Chart
-            const detectorData = {};
-            {% for detector_result in scan_result.detector_results %}
-                {% if detector_result.vulnerabilities %}
-                    detectorData['{{ detector_result.detector_name }}'] = {{ detector_result.vulnerabilities|length }};
-                {% endif %}
-            {% endfor %}
-
-            const detectorCtx = document.getElementById('detectorChart').getContext('2d');
-            const detectorChart = new Chart(detectorCtx, {
-                type: 'bar',
-                data: {
-                    labels: Object.keys(detectorData),
-                    datasets: [{
-                        label: 'Vulnerabilities',
-                        data: Object.values(detectorData),
-                        backgroundColor: '#2563eb',
-                        borderColor: '#1d4ed8',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                stepSize: 1
-                            }
-                        }
-                    }
-                }
-            });
-        });
-    </script>
-</body>
-</html>"""
-
-        with open(template_path, "w", encoding="utf-8") as f:
-            f.write(template_content)
 
     def generate(
         self, scan_result: ScanResult, output_path: Optional[str] = None
     ) -> str:
-        """Generate HTML security report."""
-        if output_path is None:
-            output_path = self._get_output_path(scan_result, "html")
-
-        try:
-            template = self._load_template()
-            html_content = template.render(scan_result=scan_result)
-        except Exception as e:
-            print(f"❌ Error generating HTML report: {e}")
-            # Fallback to simple HTML
-            html_content = self._create_fallback_html(scan_result)
-
-        # Write to file
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write(html_content)
-
-        print(f"📄 Beautiful HTML report generated: {output_path}")
-        return output_path
-
-    def _create_fallback_html(self, scan_result: ScanResult) -> str:
-        """Create a fallback HTML report if template fails."""
-        severity_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
-        for detector_result in scan_result.detector_results:
-            for vulnerability in detector_result.vulnerabilities:
-                severity_counts[vulnerability.severity.value] += 1
-
-        return f"""
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Security Report - {scan_result.target_url}</title>
-            <style>
-                body {{ font-family: Arial, sans-serif; margin: 40px; }}
-                .vuln {{ border-left: 4px solid #dc3545; padding: 10px; margin: 10px 0; }}
-            </style>
-        </head>
-        <body>
-            <h1>Security Scan Report</h1>
-            <p><strong>Target:</strong> {scan_result.target_url}</p>
-            <p><strong>Vulnerabilities:</strong> {scan_result.total_vulnerabilities}</p>
-            <p><strong>Risk Score:</strong> {scan_result.risk_score:.1f}/10.0</p>
-            
-            <h2>Findings</h2>
-            {"".join(
-                f'<div class="vuln"><h3>{vuln.title}</h3><p>{vuln.description}</p></div>'
-                for detector in scan_result.detector_results 
-                for vuln in detector.vulnerabilities
-            )}
-        </body>
-        </html>
         """
+        Generate an HTML security report from scan results.
+
+        Args:
+            scan_result: The scan results to report on
+            output_path: Optional custom output path
+
+        Returns:
+            Path to the generated report file
+        """
+        try:
+            # Generate output path if not provided
+            if output_path is None:
+                output_path = self._get_output_path(scan_result, "html")
+
+            # Load and render template
+            with open(self.template_path, "r", encoding="utf-8") as f:
+                template_content = f.read()
+
+            template = Template(template_content)
+
+            # Prepare data for template
+            report_data = self._prepare_report_data(scan_result)
+
+            # Render template
+            html_report = template.render(**report_data)
+
+            # Ensure output directory exists
+            output_path = Path(output_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Write report
+            with open(output_path, "w", encoding="utf-8") as f:
+                f.write(html_report)
+
+            return str(output_path)
+
+        except Exception as e:
+            raise Exception(f"Failed to generate HTML report: {str(e)}")
+
+    def _prepare_report_data(self, scan_result: ScanResult) -> dict:
+        """
+        Prepare and structure data for the HTML template.
+        """
+        # Calculate severity counts
+        severity_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+
+        # Group vulnerabilities by detector
+        detector_map = {}
+
+        # Process vulnerabilities from detector results
+        vulnerabilities = []
+        for detector_result in getattr(scan_result, "detector_results", []):
+            detector_name = getattr(detector_result, "detector_name", "Unknown")
+
+            # Add vulnerabilities from this detector
+            for vulnerability in getattr(detector_result, "vulnerabilities", []):
+                severity = getattr(vulnerability, "severity", "low")
+                # Convert Severity enum to string if needed
+                if hasattr(severity, "value"):
+                    severity = severity.value
+                severity = severity.lower()
+
+                # Count severities
+                if severity in severity_counts:
+                    severity_counts[severity] += 1
+
+                # Group by detector
+                if detector_name not in detector_map:
+                    detector_map[detector_name] = {
+                        "name": detector_name,
+                        "icon": self._get_detector_icon(detector_name),
+                        "vulnerabilities": [],
+                    }
+
+                # Convert vulnerability to dict for template
+                vuln_dict = {
+                    "title": getattr(
+                        vulnerability,
+                        "title",
+                        getattr(vulnerability, "type", "Unknown Vulnerability"),
+                    ),
+                    "severity": severity,
+                    "description": getattr(vulnerability, "description", ""),
+                    "location": getattr(vulnerability, "location", ""),
+                    "evidence": getattr(vulnerability, "evidence", ""),
+                    "remediation": getattr(vulnerability, "remediation", ""),
+                }
+                detector_map[detector_name]["vulnerabilities"].append(vuln_dict)
+                vulnerabilities.append(vuln_dict)
+
+        # Convert to list for template
+        detectors = list(detector_map.values())
+
+        # Calculate risk score and level
+        risk_score = getattr(scan_result, "risk_score", 0.0)
+        risk_level = self._calculate_risk_level(risk_score)
+
+        # Get scan configuration
+        scan_config = getattr(scan_result, "scan_config", None)
+
+        return {
+            "target_url": getattr(scan_result, "target_url", "Unknown"),
+            "scan_date": getattr(scan_result, "timestamp", datetime.now()).strftime(
+                "%Y-%m-%d %H:%M"
+            ),
+            "risk_score": f"{risk_score:.1f}",
+            "risk_level": risk_level,
+            "total_vulnerabilities": len(vulnerabilities),
+            "scan_duration": self._format_duration(
+                getattr(scan_result, "scan_duration", 0)
+            ),
+            "severity_counts": severity_counts,
+            "detectors": detectors,
+            "scan_config": {
+                "timeout": self._get_config_value(scan_config, "timeout", "30s"),
+                "follow_redirects": self._get_config_value(
+                    scan_config, "follow_redirects", "Yes"
+                ),
+                "ssl_verification": self._get_config_value(
+                    scan_config, "verify_ssl", "Enabled"
+                ),
+            },
+            "generation_timestamp": datetime.now().strftime("%Y-%m-%d at %H:%M:%S"),
+        }
+
+    def _calculate_risk_level(self, risk_score: float) -> str:
+        """Calculate risk level based on risk score."""
+        if risk_score >= 8.0:
+            return "Critical"
+        elif risk_score >= 6.0:
+            return "High"
+        elif risk_score >= 4.0:
+            return "Medium"
+        elif risk_score >= 2.0:
+            return "Low"
+        else:
+            return "Very Low"
+
+    def _format_duration(self, duration_seconds: float) -> str:
+        """Format duration in seconds to human-readable string."""
+        if duration_seconds < 1:
+            return f"{duration_seconds * 1000:.0f}ms"
+        elif duration_seconds < 60:
+            return f"{duration_seconds:.2f}s"
+        else:
+            minutes = int(duration_seconds // 60)
+            seconds = duration_seconds % 60
+            return f"{minutes}m {seconds:.2f}s"
+
+    def _get_config_value(self, scan_config, key: str, default: str) -> str:
+        """Safely get configuration value with proper formatting."""
+        if scan_config is None:
+            return default
+
+        # Try to get attribute from ScanConfig object
+        value = getattr(scan_config, key, default)
+
+        # Convert boolean values to Yes/No
+        if isinstance(value, bool):
+            return "Yes" if value else "No"
+
+        # Format timeout with 's'
+        if key == "timeout" and isinstance(value, (int, float)):
+            return f"{value}s"
+
+        return str(value)
+
+    def _get_detector_icon(self, detector_name: str) -> str:
+        """Get appropriate icon for detector type."""
+        icon_map = {
+            "Security Headers": "🛡️",
+            "SQL Injection": "💉",
+            "XSS": "🎯",
+            "CORS": "🌐",
+            "JWT": "🔑",
+            "CSRF": "🔄",
+            "XXE": "📄",
+            "SSRF": "🔄",
+            "File Inclusion": "📁",
+            "Command Injection": "💻",
+            "IDOR": "👤",
+        }
+        return icon_map.get(detector_name, "🔍")
+
+    def generate_sample_report(self, output_path: Optional[str] = None) -> str:
+        """
+        Generate a sample report for testing and demonstration.
+        """
+        from security_scanner.core.models import (
+            ScanResult,
+            DetectorResult,
+            Vulnerability,
+            ScanConfig,
+        )
+        from datetime import datetime
+
+        # Create sample vulnerabilities
+        sample_vulnerabilities = [
+            Vulnerability(
+                type="missing_security_headers",
+                title="Missing Content-Security-Policy Header",
+                severity="high",  # This should be a Severity enum in your actual model
+                description="Content Security Policy header is missing, leaving the application vulnerable to XSS attacks",
+                location="HTTP Response Headers",
+                evidence="Response headers: X-Frame-Options: SAMEORIGIN\nStrict-Transport-Security: max-age=31536000\nMissing: Content-Security-Policy",
+                remediation="Implement a Content Security Policy header with appropriate directives for your application",
+            ),
+            Vulnerability(
+                type="missing_security_headers",
+                title="Missing X-Content-Type-Options Header",
+                severity="medium",
+                description="X-Content-Type-Options header is missing, which could allow MIME type sniffing",
+                location="HTTP Response Headers",
+                evidence="Response does not include X-Content-Type-Options header",
+                remediation="Add X-Content-Type-Options: nosniff header",
+            ),
+        ]
+
+        # Create detector results
+        detector_results = [
+            DetectorResult(
+                detector_name="Security Headers", vulnerabilities=sample_vulnerabilities
+            )
+        ]
+
+        # Create sample scan result
+        sample_result = ScanResult(
+            target_url="https://www.example.com",
+            timestamp=datetime.now(),
+            detector_results=detector_results,
+            scan_config=ScanConfig(
+                target_url="https://www.example.com",
+                timeout=30,
+                verify_ssl=True,
+                follow_redirects=True,
+            ),
+            scan_duration=12.45,
+            risk_score=6.1,
+            total_vulnerabilities=len(sample_vulnerabilities),
+        )
+
+        return self.generate(sample_result, output_path)

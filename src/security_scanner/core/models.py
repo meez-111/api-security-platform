@@ -75,6 +75,8 @@ class ScanConfig(BaseModel):
         scan_jwt: Enable JWT vulnerability detector
         scan_headers: Enable security headers detector
         scan_cors: Enable CORS misconfiguration detector
+        scan_sql_injection: Enable SQL injection detector
+        scan_xss: Enable XSS detector
     """
 
     target_url: str
@@ -85,6 +87,8 @@ class ScanConfig(BaseModel):
     scan_jwt: bool = True
     scan_headers: bool = True
     scan_cors: bool = True
+    scan_sql_injection: bool = True
+    scan_xss: bool = True
 
 
 class ScanResult(BaseModel):

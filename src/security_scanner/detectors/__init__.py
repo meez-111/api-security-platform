@@ -1,20 +1,45 @@
-from .base import BaseDetector
-from .jwt import JWTDetector, create_jwt_detector
-from .headers import HeadersDetector, create_headers_detector
-from .cors import CORSDetector, create_cors_detector
-from .sql_injection import SQLInjectionDetector, create_sql_injection_detector
-from .xss import XSSDetector, create_xss_detector
+"""
+Security Detectors Package
 
+This package contains all vulnerability detectors for the security scanner.
+"""
+
+from .base import BaseDetector
+
+# Import existing detectors
+from .headers import HeadersDetector
+from .cors import CORSDetector
+from .jwt import JWTDetector
+
+# Import new detectors
+from .sql_injection import SQLInjectionDetector
+from .xss import XSSDetector
+
+# Export all detectors
 __all__ = [
+    # Base
     "BaseDetector",
-    "JWTDetector",
-    "create_jwt_detector",
+    # Detectors
     "HeadersDetector",
-    "create_headers_detector",
     "CORSDetector",
-    "create_cors_detector",
+    "JWTDetector",
     "SQLInjectionDetector",
-    "create_sql_injection_detector",
     "XSSDetector",
-    "create_xss_detector",
 ]
+
+# Available detector types
+DETECTOR_CLASSES = {
+    "headers": HeadersDetector,
+    "cors": CORSDetector,
+    "jwt": JWTDetector,
+    "sql_injection": SQLInjectionDetector,
+    "xss": XSSDetector,
+}
+
+
+def create_detector(detector_type: str):
+    """Factory function to create detectors by type."""
+    detector_class = DETECTOR_CLASSES.get(detector_type)
+    if detector_class:
+        return detector_class()
+    raise ValueError(f"Unknown detector type: {detector_type}")
