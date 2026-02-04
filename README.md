@@ -1,4 +1,3 @@
-Here's the updated README.md with a screenshot section added:
 
 # 🛡️ HorseSec - Advanced API Security Scanner
 
